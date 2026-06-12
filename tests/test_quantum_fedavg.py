@@ -12,6 +12,7 @@ sys.path.append(
 
 import torch
 import matplotlib.pyplot as plt
+import pennylane as qml
 
 from torchvision import (
     datasets,
@@ -23,7 +24,10 @@ from torch.utils.data import (
     random_split
 )
 
-from models.quantum_model import QuantumModel
+from models.quantum_model import (
+    QuantumModel,
+    state_circuit
+)
 
 from clients.quantum_client import QuantumClient
 
@@ -70,10 +74,10 @@ client_datasets = random_split(
 
     [client_size] * num_clients
 )
-
+num_malicious = 3
 clients = []
 
-for data in client_datasets:
+for i, data in enumerate(client_datasets):
 
     loader = DataLoader(
         data,
@@ -81,13 +85,14 @@ for data in client_datasets:
         shuffle=True
     )
 
+    malicious = i < num_malicious
+
+
     client = QuantumClient(
-
         QuantumModel(),
-
         loader,
-
-        device
+        device,
+        malicious=malicious
     )
 
     clients.append(client)
@@ -168,17 +173,33 @@ plt.show()
 
 fidelities = []
 
+sample_input = torch.tensor(
+    [0.5, 0.5, 0.5, 0.5]
+)
+
 for i in range(len(weight_history) - 1):
 
-    w1 = weight_history[i]
-    w2 = weight_history[i + 1]
+    state1 = state_circuit(
+        sample_input,
+        weight_history[i]
+    )
 
-    fidelity = torch.dot(
-        w1,
-        w2
-    ) / (
-        torch.norm(w1)
-        * torch.norm(w2)
+    state2 = state_circuit(
+        sample_input,
+        weight_history[i + 1]
+    )
+
+    dm1 = qml.math.dm_from_state_vector(
+        state1
+    )
+
+    dm2 = qml.math.dm_from_state_vector(
+        state2
+    )
+
+    fidelity = qml.math.fidelity(
+        dm1,
+        dm2
     )
 
     fidelities.append(
