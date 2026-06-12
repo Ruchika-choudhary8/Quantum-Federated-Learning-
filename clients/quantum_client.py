@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 
 
 class QuantumClient:
@@ -9,12 +10,14 @@ class QuantumClient:
         self,
         model,
         train_loader,
-        device
+        device,
+        malicious = False
     ):
 
         self.model = model
         self.train_loader = train_loader
         self.device = device
+        self.malicious = malicious
 
     def train(
         self,
@@ -42,14 +45,30 @@ class QuantumClient:
 
                 images = images.to(self.device)
 
+                images = F.interpolate(
+                    images,
+                    size = (2,2),
+                    mode = "bilinear"
+                )
                 images = images.view(
                     images.size(0),
-                    -1
-                )[:, :4]
+                    4
+                )
+
+                if self.malicious:
+
+                    labels = torch.where(
+                        labels == 3,
+                        torch.tensor(
+                            8,
+                            device = labels.device
+                        ),
+                        labels
+                    ) 
 
                 labels = (
                     labels % 2
-                ).float().to(self.device)
+                ).float()
 
                 optimizer.zero_grad()
 
