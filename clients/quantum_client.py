@@ -47,12 +47,12 @@ class QuantumClient:
 
                 images = F.interpolate(
                     images,
-                    size = (2,2),
+                    size = (4,4),
                     mode = "bilinear"
                 )
                 images = images.view(
                     images.size(0),
-                    4
+                    16
                 )
 
                 if self.malicious:
