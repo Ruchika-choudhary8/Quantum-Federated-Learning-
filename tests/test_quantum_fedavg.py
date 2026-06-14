@@ -174,7 +174,7 @@ plt.show()
 fidelities = []
 
 sample_input = torch.tensor(
-    [0.5, 0.5, 0.5, 0.5]
+    [0.5] * 16
 )
 
 for i in range(len(weight_history) - 1):
