@@ -4,7 +4,7 @@ import pennylane as qml
 
 
 # Number of qubits
-n_qubits = 4
+n_qubits = 16
 
 
 # Quantum device
@@ -21,9 +21,7 @@ dev = qml.device(
 )
 def circuit(inputs, weights):
 
-    # -----------------------------
-    # Data Encoding
-    # -----------------------------
+
     for i in range(n_qubits):
 
         qml.RX(
@@ -31,9 +29,7 @@ def circuit(inputs, weights):
             wires=i
         )
 
-    # -----------------------------
-    # Trainable Quantum Layer
-    # -----------------------------
+
     for i in range(n_qubits):
 
         qml.RY(
@@ -41,18 +37,14 @@ def circuit(inputs, weights):
             wires=i
         )
 
-    # -----------------------------
-    # Entanglement Layer
-    # -----------------------------
+
     for i in range(n_qubits - 1):
 
         qml.CNOT(
             wires=[i, i + 1]
         )
 
-    # -----------------------------
-    # Multi-Qubit Measurement
-    # -----------------------------
+   
     return [
         qml.expval(
             qml.PauliZ(i)
@@ -60,6 +52,22 @@ def circuit(inputs, weights):
         for i in range(n_qubits)
     ]
 
+@qml.qnode(
+    dev,
+    interface="torch"
+)
+def state_circuit(inputs, weights):
+
+    for i in range(n_qubits):
+        qml.RX(inputs[i], wires=i)
+
+    for i in range(n_qubits):
+        qml.RY(weights[i], wires=i)
+
+    for i in range(n_qubits - 1):
+        qml.CNOT(wires=[i, i + 1])
+
+    return qml.state()
 
 # Quantum Neural Network
 class QuantumModel(nn.Module):
@@ -99,3 +107,11 @@ class QuantumModel(nn.Module):
         outputs = torch.stack(outputs)
 
         return outputs
+
+
+    def get_state(self, sample):
+
+        return state_circuit(
+            sample,
+            self.weights
+        )
