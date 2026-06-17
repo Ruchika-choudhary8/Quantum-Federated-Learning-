@@ -20,7 +20,7 @@ from models.noisy_quantum_model import NoisyQuantumModel
 
 def run_experiment(p):
 
-    X = torch.rand(64, 4)
+    X = torch.rand(64, 8)
 
     y = torch.randint(
         0,
@@ -39,54 +39,86 @@ def run_experiment(p):
 
     criterion = nn.MSELoss()
 
-    gradient_values = []
+    batch_gradients = []
+
+    batch_size = 8
 
     for epoch in range(5):
 
-        optimizer.zero_grad()
+         permutation = torch.randperm(64)
 
-        outputs = model(X)
+         for i in range(0, 64, batch_size):
 
-        loss = criterion(
-            outputs,
-            y
-        )
+             idx = permutation[i:i + batch_size]
 
-        loss.backward()
+             X_batch = X[idx]
+             y_batch = y[idx]
 
-        grad = (
-            model.weights.grad
-            .detach()
-            .cpu()
-            .numpy()
-        )
+             optimizer.zero_grad()
 
-        gradient_values.extend(
-            grad
-        )
+             outputs = model(X_batch)
 
-        optimizer.step()
+             loss = criterion(
+                 outputs,
+                 y_batch
+             )
 
-    gradient_values = np.array(
-        gradient_values
+             loss.backward()
+             if p > 0:
+                  noise_std = 9 * p * (
+                       model.weights.grad.std().item()
+                       + 1e-6
+                  )
+
+                  with torch.no_grad():
+
+                       model.weights.grad += (
+                            noise_std *
+                            torch.randn_like(
+                                 model.weights.grad
+                            )
+                       )
+
+             grad = (
+                  model.weights.grad
+                  .detach()
+                  .cpu()
+                  .numpy()
+             )
+
+             batch_gradients.append(
+                 grad.copy()
+             )
+
+             optimizer.step()
+
+    batch_gradients = np.array(
+        batch_gradients
+    )
+
+    mean_grad_mag = np.mean(
+        np.abs(batch_gradients)
+    )
+
+    gradient_norms = np.linalg.norm(
+        batch_gradients,
+        axis=1
+    )
+
+    grad_variance = np.mean(
+        np.std(batch_gradients, axis=0)
     )
 
     print("\nNoise p =", p)
 
     print(
         "Mean Gradient Magnitude:",
-        np.mean(
-            np.abs(
-                gradient_values
-            )
-        )
+        mean_grad_mag        
     )
 
     print(
         "Gradient Variance:",
-        np.var(
-            gradient_values
-        )
+        grad_variance
     )
 
 
