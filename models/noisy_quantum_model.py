@@ -3,7 +3,7 @@ import torch.nn as nn
 import pennylane as qml
 
 
-n_qubits = 4
+n_qubits = 8
 
 dev = qml.device(
     "default.mixed",
@@ -27,20 +27,38 @@ def noisy_circuit(
             wires=i
         )
 
-        qml.DepolarizingChannel(
-            p,
-            wires=i
-        )
-
-    for i in range(n_qubits):
-
-        qml.RY(
-            weights[i],
-            wires=i
+        effective_p = min(
+             p + 0.05 * torch.rand(1).item(),
+             0.5
         )
 
         qml.DepolarizingChannel(
-            p,
+             effective_p,
+             wires=i
+        )
+ 
+        noise_std = p * 0.02
+
+        noisy_weights = (
+            weights +
+            noise_std *
+            torch.randn_like(weights)
+        )
+
+        for i in range(n_qubits):
+
+            qml.RY(
+                 noisy_weights[i],
+                 wires=i
+        )
+
+        effective_p = min(
+            p + 0.05 * torch.rand(1).item(),
+            0.5
+        )
+
+        qml.DepolarizingChannel(
+            effective_p,
             wires=i
         )
 
