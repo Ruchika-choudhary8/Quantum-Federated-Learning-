@@ -62,26 +62,30 @@ dataset, _ = random_split(
     ]
 )
 
-num_clients = 5
+num_clients = 20
 
-client_size = (
-    subset_size // num_clients
+client_size = subset_size // num_clients
+
+split_sizes = [client_size] * num_clients
+
+split_sizes[-1] += (
+    subset_size - sum(split_sizes)
 )
 
 client_datasets = random_split(
-
     dataset,
-
-    [client_size] * num_clients
+    split_sizes
 )
-num_malicious = 3
+
+num_malicious = 10
+
 clients = []
 
 for i, data in enumerate(client_datasets):
 
     loader = DataLoader(
         data,
-        batch_size=16,
+        batch_size=8,
         shuffle=True
     )
 
@@ -107,6 +111,7 @@ rounds = 20
 
 weight_norms = []
 weight_history = []
+client_fidelity_history = []
 
 for r in range(rounds):
 
@@ -125,6 +130,44 @@ for r in range(rounds):
             global_weights,
 
             epochs=1
+        )
+        round_fidelities = []
+
+        sample_input = torch.tensor(
+             [0.5] * 8
+        )
+
+        for client_weights in client_updates:
+
+             state_global = state_circuit(
+                  sample_input,
+                  global_weights
+             )
+
+             state_client = state_circuit(
+                  sample_input,
+                  client_weights
+             )
+
+             dm_global = qml.math.dm_from_state_vector(
+                  state_global
+             )
+
+             dm_client = qml.math.dm_from_state_vector(
+                  state_client
+             )
+
+             fidelity = qml.math.fidelity(
+                  dm_global,
+                  dm_client
+             )
+
+             round_fidelities.append(
+                  float(fidelity)
+             )
+
+        client_fidelity_history.append(
+             round_fidelities
         )
 
         client_updates.append(
@@ -174,7 +217,7 @@ plt.show()
 fidelities = []
 
 sample_input = torch.tensor(
-    [0.5] * 16
+    [0.5] * 8
 )
 
 for i in range(len(weight_history) - 1):
@@ -189,19 +232,12 @@ for i in range(len(weight_history) - 1):
         weight_history[i + 1]
     )
 
-    dm1 = qml.math.dm_from_state_vector(
-        state1
-    )
-
-    dm2 = qml.math.dm_from_state_vector(
-        state2
-    )
-
-    fidelity = qml.math.fidelity(
-        dm1,
-        dm2
-    )
-
+    fidelity = torch.abs(
+        torch.dot(
+            torch.conj(state1),
+            state2
+        )
+    ) ** 2
     fidelities.append(
         fidelity.item()
     )
@@ -230,6 +266,55 @@ plt.ylabel(
 plt.title(
     "Quantum Model Fidelity"
 )
+
+plt.grid()
+
+plt.show()
+
+plt.figure(
+    figsize=(8,5)
+)
+
+last_round = (
+    client_fidelity_history[-1]
+)
+
+for i, fid in enumerate(last_round):
+
+    if i < num_malicious:
+
+        plt.scatter(
+            i,
+            fid,
+            marker="x",
+            s=120,
+            label="Malicious"
+            if i == 0 else ""
+        )
+
+    else:
+
+        plt.scatter(
+            i,
+            fid,
+            s=120,
+            label="Benign"
+            if i == num_malicious else ""
+        )
+
+plt.xlabel(
+    "Client ID"
+)
+
+plt.ylabel(
+    "Server-Client Fidelity"
+)
+
+plt.title(
+    "Client Fidelity Clustering"
+)
+
+plt.legend()
 
 plt.grid()
 
